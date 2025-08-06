@@ -14,8 +14,6 @@ def parse_gps(gps_str):
         return (lat, lon)
     except:
         return None
-
-def get_address_coordinates(address):
     geolocator = Nominatim(user_agent="delivery_checker_api/1.0", timeout=10)
     try:
         location = geolocator.geocode(address)
