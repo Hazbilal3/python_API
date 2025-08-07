@@ -6,8 +6,13 @@ from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 # ✅ Insert your Google Maps Geocoding API key here
 geolocator = GoogleV3(api_key="AIzaSyDgFdD4VOsPjHXTEZElpA3OYLsJEIMhR_0")
 
-def load_data(file_path="datamanifest.csv"):
-    df = pd.read_csv(file_path, dtype={'Barcode': str})
+def load_data(file_path):
+    if file_path.endswith(".csv"):
+        df = pd.read_csv(file_path, dtype={'Barcode': str})
+    elif file_path.endswith(".xlsx"):
+        df = pd.read_excel(file_path, dtype={'Barcode': str})
+    else:
+        raise ValueError("Unsupported file format")
     df['Barcode'] = df['Barcode'].str.strip()
     return df
 

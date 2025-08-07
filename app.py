@@ -1,17 +1,46 @@
+# app.py
+
 from flask import Flask, request, jsonify, send_file
 from verify import load_data, parse_gps, check_match
 import pandas as pd
+import os
 
 app = Flask(__name__)
-data = load_data()
-results_df = pd.DataFrame()  # Global placeholder for Excel download
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Use this to track current file used for verification
+current_data_file = None
+results_df = pd.DataFrame()
 
 @app.route('/')
 def home():
     return "✅ Delivery Verification API is live."
 
+@app.route('/upload_file', methods=['POST'])
+def upload_file():
+    global current_data_file
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part in the request'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if file:
+        filename = file.filename
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        current_data_file = filepath
+        return jsonify({'message': f'File {filename} uploaded successfully and ready for verification.'})
+
 @app.route('/verify', methods=['GET'])
 def verify_one():
+    global current_data_file
+    if not current_data_file:
+        return jsonify({'error': 'No uploaded file found. Please upload one using /upload_file'}), 400
+
+    data = load_data(current_data_file)
     barcode = request.args.get('barcode')
     if not barcode:
         return jsonify({'error': 'Barcode is required'}), 400
@@ -37,7 +66,11 @@ def verify_one():
 
 @app.route('/verify_all', methods=['GET'])
 def verify_all():
-    global results_df
+    global current_data_file, results_df
+    if not current_data_file:
+        return jsonify({'error': 'No uploaded file found. Please upload one using /upload_file'}), 400
+
+    data = load_data(current_data_file)
     results = []
     for _, row in data.iterrows():
         barcode = row['Barcode']
@@ -55,10 +88,7 @@ def verify_all():
         })
 
     results_df = pd.DataFrame(results)
-
-    # ✅ Show result as HTML table (in browser)
     return results_df.to_html(index=False, escape=False, justify="center", border=1)
-
 
 @app.route('/download_excel', methods=['GET'])
 def download_excel():
