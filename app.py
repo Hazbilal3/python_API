@@ -70,9 +70,24 @@ def verify_all():
     if not current_data_file:
         return jsonify({'error': 'No uploaded file found. Please upload one using /upload_file'}), 400
 
+    try:
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 25))
+        if page < 1 or per_page < 1:
+            raise ValueError
+    except ValueError:
+        return jsonify({'error': 'Invalid page or per_page parameter'}), 400
+
     data = load_data(current_data_file)
+    total_items = len(data)
+    total_pages = (total_items + per_page - 1) // per_page
+
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_data = data.iloc[start_idx:end_idx]
+
     results = []
-    for _, row in data.iterrows():
+    for _, row in paginated_data.iterrows():
         barcode = row['Barcode']
         address = row['Address']
         gps = parse_gps(row['Last GPS location'])
@@ -84,11 +99,19 @@ def verify_all():
             'Expected Location': expected,
             'Distance (km)': distance,
             'Status': status,
-            'Google Maps Link': f'<a href="{gmap_link}" target="_blank">Open in Maps</a>' if gmap_link else "N/A"
+            'Google Maps Link': gmap_link or "N/A"
         })
 
+    # Save full results_df for optional download (just for current page)
     results_df = pd.DataFrame(results)
-    return results_df.to_html(index=False, escape=False, justify="center", border=1)
+
+    return jsonify({
+        'page': page,
+        'per_page': per_page,
+        'total_items': total_items,
+        'total_pages': total_pages,
+        'results': results
+    })
 
 @app.route('/download_excel', methods=['GET'])
 def download_excel():
